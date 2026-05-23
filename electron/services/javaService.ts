@@ -84,12 +84,21 @@ export class JavaService {
     const classFile = join(tmpDir, basename(entry))
     writeFileSync(classFile, classData)
 
+    console.log('[CFR] cfrJar:', cfrJar)
+    console.log('[CFR] classFile:', classFile, '| exists:', existsSync(classFile))
+    console.log('[CFR] java PATH:', process.env.PATH)
+
     try {
       const result = spawnSync('java', ['-jar', cfrJar, classFile, '--silent', 'true'], {
         encoding: 'utf-8',
         cwd: tmpDir,
         timeout: 30000
       })
+
+      console.log('[CFR] status:', result.status)
+      console.log('[CFR] error:', result.error)
+      console.log('[CFR] stderr:', result.stderr)
+      console.log('[CFR] stdout (first 200):', (result.stdout || '').substring(0, 200))
 
       if (result.error) {
         return { source: '', error: `Failed to launch java: ${result.error.message}` }
