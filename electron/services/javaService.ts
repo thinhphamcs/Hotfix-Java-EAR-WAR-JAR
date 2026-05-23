@@ -26,14 +26,18 @@ export interface Diagnostic {
   severity: 'error' | 'warning'
 }
 
-function findJava(): string {
+function findJavaTool(name: string): string | null {
   const javaHome = process.env.JAVA_HOME
   if (javaHome) {
-    const candidate = join(javaHome, 'bin', process.platform === 'win32' ? 'java.exe' : 'java')
+    const candidate = join(javaHome, 'bin', process.platform === 'win32' ? `${name}.exe` : name)
     if (existsSync(candidate)) return candidate
   }
-  const fromPath = findExecutable('java')
-  if (fromPath) return fromPath
+  return findExecutable(name)
+}
+
+function findJava(): string {
+  const found = findJavaTool('java')
+  if (found) return found
   throw new Error('java not found. Set JAVA_HOME or add java to PATH.')
 }
 
@@ -149,9 +153,9 @@ export class JavaService {
     javaSource: string,
     archiveService: ArchiveService
   ): Promise<CompileResult> {
-    const javacPath = findExecutable('javac')
+    const javacPath = findJavaTool('javac')
     if (!javacPath) {
-      return { success: false, error: 'javac not found on PATH. Install a JDK to enable recompilation.' }
+      return { success: false, error: 'javac not found. Set JAVA_HOME or add javac to PATH.' }
     }
 
     const tmpDir = join(tmpdir(), 'ear-javac-' + randomBytes(6).toString('hex'))
