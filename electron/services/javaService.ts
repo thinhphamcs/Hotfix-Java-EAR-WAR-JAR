@@ -1,6 +1,6 @@
 import { execSync, spawnSync } from 'child_process'
 import { existsSync, mkdirSync, writeFileSync, readFileSync, rmSync } from 'fs'
-import { join, basename, extname } from 'path'
+import { join, basename } from 'path'
 import { tmpdir } from 'os'
 import { app } from 'electron'
 import { randomBytes } from 'crypto'
@@ -91,11 +91,16 @@ export class JavaService {
         timeout: 30000
       })
 
+      if (result.error) {
+        return { source: '', error: `Failed to launch java: ${result.error.message}` }
+      }
+
       const source = result.stdout || ''
       const stderr = result.stderr || ''
 
       if (result.status !== 0 && !source.trim()) {
-        return { source: '', error: stderr || 'CFR decompilation failed' }
+        const detail = stderr || `CFR exited with code ${result.status}`
+        return { source: '', error: detail }
       }
 
       return { source }
