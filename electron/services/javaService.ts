@@ -1,5 +1,5 @@
 import { execSync, spawnSync } from 'child_process'
-import { existsSync, mkdirSync, writeFileSync, readFileSync, rmSync } from 'fs'
+import { existsSync, mkdirSync, writeFileSync, readFileSync, rmSync, readdirSync } from 'fs'
 import { join, basename } from 'path'
 import { tmpdir } from 'os'
 import { app } from 'electron'
@@ -26,14 +26,27 @@ export interface Diagnostic {
   severity: 'error' | 'warning'
 }
 
-function getCfrJar(): string {
-  const prodPath = join(process.resourcesPath || '', 'cfr', 'cfr.jar')
+function getVineflowerJar(): string {
+  const prodPath = join(process.resourcesPath || '', 'vineflower', 'vineflower.jar')
   if (existsSync(prodPath)) return prodPath
 
-  const devPath = join(app.getAppPath(), 'resources', 'cfr', 'cfr.jar')
+  const devPath = join(app.getAppPath(), 'resources', 'vineflower', 'vineflower.jar')
   if (existsSync(devPath)) return devPath
 
-  throw new Error('cfr.jar not found. Place it at resources/cfr/cfr.jar')
+  throw new Error('vineflower.jar not found. Place it at resources/vineflower/vineflower.jar')
+}
+
+function findFirstJavaFile(dir: string): string | null {
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const full = join(dir, entry.name)
+    if (entry.isDirectory()) {
+      const found = findFirstJavaFile(full)
+      if (found) return found
+    } else if (entry.name.endsWith('.java')) {
+      return full
+    }
+  }
+  return null
 }
 
 function findExecutable(name: string): string | null {
@@ -74,46 +87,40 @@ export class JavaService {
     entryPath: string,
     archiveService: ArchiveService
   ): Promise<{ source: string; error?: string }> {
-    const cfrJar = getCfrJar()
+    const vineflowerJar = getVineflowerJar()
 
     const classData = archiveService.readFileEntry(archivePath, entryPath)
-    const tmpDir = join(tmpdir(), 'ear-cfr-' + randomBytes(6).toString('hex'))
+    const tmpDir = join(tmpdir(), 'ear-vf-' + randomBytes(6).toString('hex'))
     mkdirSync(tmpDir, { recursive: true })
 
     const { entry } = archiveService.resolveEntry(archivePath, entryPath)
     const classFile = join(tmpDir, basename(entry))
     writeFileSync(classFile, classData)
 
-    console.log('[CFR] cfrJar:', cfrJar)
-    console.log('[CFR] classFile:', classFile, '| exists:', existsSync(classFile))
-    console.log('[CFR] java PATH:', process.env.PATH)
+    const outDir = join(tmpDir, 'out')
+    mkdirSync(outDir, { recursive: true })
 
     try {
-      const result = spawnSync('java', ['-jar', cfrJar, classFile, '--silent', 'true'], {
+      const result = spawnSync('java', ['-jar', vineflowerJar, classFile, outDir], {
         encoding: 'utf-8',
-        cwd: tmpDir,
-        timeout: 30000,
-        shell: true
+        timeout: 30000
       })
-
-      console.log('[CFR] status:', result.status)
-      console.log('[CFR] error:', result.error)
-      console.log('[CFR] stderr:', result.stderr)
-      console.log('[CFR] stdout (first 200):', (result.stdout || '').substring(0, 200))
 
       if (result.error) {
         return { source: '', error: `Failed to launch java: ${result.error.message}` }
       }
 
-      const source = result.stdout || ''
-      const stderr = result.stderr || ''
-
-      if (result.status !== 0 && !source.trim()) {
-        const detail = stderr || `CFR exited with code ${result.status}`
+      if (result.status !== 0) {
+        const detail = result.stderr || `Vineflower exited with code ${result.status}`
         return { source: '', error: detail }
       }
 
-      return { source }
+      const javaFile = findFirstJavaFile(outDir)
+      if (!javaFile) {
+        return { source: '', error: 'Vineflower produced no output' }
+      }
+
+      return { source: readFileSync(javaFile, 'utf-8') }
     } finally {
       try { rmSync(tmpDir, { recursive: true, force: true }) } catch {}
     }

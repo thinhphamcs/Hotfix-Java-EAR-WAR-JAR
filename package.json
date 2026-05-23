@@ -53,6 +53,11 @@
         "from": "resources/cfr",
         "to": "cfr",
         "filter": ["**/*"]
+      },
+      {
+        "from": "resources/vineflower",
+        "to": "vineflower",
+        "filter": ["**/*"]
       }
     ],
     "win": {
