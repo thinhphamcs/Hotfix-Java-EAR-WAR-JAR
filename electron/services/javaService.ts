@@ -114,9 +114,13 @@ export class JavaService {
     const javaExe = findJava()
 
     try {
-      const result = spawnSync(javaExe, ['-jar', vineflowerJar, classFile, outDir], {
+      const result = spawnSync(javaExe, [
+        '-Xverify:none',  // OpenJ9 strict verifier rejects Vineflower's Kotlin metadata classes
+        '-Xint',          // disable JIT to avoid OpenJ9 JIT crashes on Windows (STATUS_STACK_BUFFER_OVERRUN)
+        '-jar', vineflowerJar, classFile, outDir
+      ], {
         encoding: 'utf-8',
-        timeout: 30000
+        timeout: 60000    // -Xint (interpreted mode) is slower, give it more time
       })
 
       if (result.error) {
