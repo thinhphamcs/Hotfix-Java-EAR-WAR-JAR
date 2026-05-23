@@ -26,6 +26,17 @@ export interface Diagnostic {
   severity: 'error' | 'warning'
 }
 
+function findJava(): string {
+  const javaHome = process.env.JAVA_HOME
+  if (javaHome) {
+    const candidate = join(javaHome, 'bin', process.platform === 'win32' ? 'java.exe' : 'java')
+    if (existsSync(candidate)) return candidate
+  }
+  const fromPath = findExecutable('java')
+  if (fromPath) return fromPath
+  throw new Error('java not found. Set JAVA_HOME or add java to PATH.')
+}
+
 function getVineflowerJar(): string {
   const prodPath = join(process.resourcesPath || '', 'vineflower', 'vineflower.jar')
   if (existsSync(prodPath)) return prodPath
@@ -100,8 +111,10 @@ export class JavaService {
     const outDir = join(tmpDir, 'out')
     mkdirSync(outDir, { recursive: true })
 
+    const javaExe = findJava()
+
     try {
-      const result = spawnSync('java', ['-jar', vineflowerJar, classFile, outDir], {
+      const result = spawnSync(javaExe, ['-jar', vineflowerJar, classFile, outDir], {
         encoding: 'utf-8',
         timeout: 30000
       })
