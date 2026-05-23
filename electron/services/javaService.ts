@@ -92,7 +92,8 @@ export class JavaService {
       const result = spawnSync('java', ['-jar', cfrJar, classFile, '--silent', 'true'], {
         encoding: 'utf-8',
         cwd: tmpDir,
-        timeout: 30000
+        timeout: 30000,
+        shell: true
       })
 
       console.log('[CFR] status:', result.status)
